@@ -34,15 +34,19 @@ Supports 10 languages - just mention the bot with your preferred language:
 - **Memory Efficient**: Uses in-memory processing (BytesIO) for cloud deployment compatibility
 
 ### Deployment 
-- **Live Monitoring**: 24/7 mention detection and automatic responses
-- **Render**: Deployed as a background worker service
+- **Scheduled Monitoring**: Checks for mentions every 10 minutes via GitHub Actions
+- **Free Hosting**: Runs on GitHub Actions public repo free tier (no server costs)
+- **State Persistence**: Uses `state.json` committed to the repo to track processed mentions between runs
 - **Robust Error Handling**: Graceful fallbacks and comprehensive logging
-- **Environment Driven**: All configuration through environment variables
+- **Environment Driven**: All configuration through GitHub Secrets
 
 ## File Structure
 
 ```
 bskyScribe/
+├── .github/
+│   └── workflows/
+│       └── bot.yml        # GitHub Actions workflow (runs every 10 min)
 ├── clients/
 │   ├── bluesky.py         # Bluesky AT Protocol client for posts and notifications
 │   └── gemini.py          # Google Gemini AI client for media processing
@@ -50,11 +54,10 @@ bskyScribe/
 │   └── transcriptionBot.py # Main media processing bot logic
 ├── prompt/
 │   └── prompt.txt         # Media processing prompt for summarization
-├── daemon.py              # Live monitoring service (Scribe class)
-├── render.yaml            # Render deployment configuration
-├── Procfile              # Process definition for deployment
-├── requirements.txt      # Python dependencies
-└── .env                  # Environment variables (API keys)
+├── check_mentions.py      # Single-run mention checker (stateless)
+├── state.json             # Persisted state (last check + processed URIs)
+├── requirements.txt       # Python dependencies
+└── .env                   # Environment variables for local dev
 ```
 
 ## Installation
@@ -82,7 +85,7 @@ pip install -r requirements.txt
    - Google Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
    - Bluesky app password from [Bluesky Settings](https://bsky.app/settings/app-passwords)
 
-2. **Create environment file:**
+2. **Create environment file (for local development):**
    ```bash
    cp .env.example .env
    # Add your API keys to .env
@@ -94,6 +97,12 @@ pip install -r requirements.txt
    BLUESKY_USERNAME=bskyscribe.bsky.social
    BLUESKY_PASSWORD=your_app_password_here
    ```
+
+4. **Add GitHub Secrets (for live deployment):**
+   Go to **Settings → Secrets and variables → Actions** and add:
+   - `GEMINI_API_KEY`
+   - `BLUESKY_USERNAME`
+   - `BLUESKY_PASSWORD`
 
 ## Usage
 
@@ -122,14 +131,20 @@ mention_text = "@bskyscribe.bsky.social español"
 success = bot.post_transcription_reply(post_url, mention_text)
 ```
 
-### Live Monitoring
+### Automated Monitoring (GitHub Actions)
 
+The bot runs automatically via GitHub Actions every **10 minutes**.
+
+To trigger a manual run:
+1. Go to **Actions → Bluesky Scribe Bot**
+2. Click **Run workflow**
+
+To run locally (one-off check):
 ```python
-from daemon import Scribe
+from check_mentions import main
 
-# Start live monitoring for mentions
-scribe = Scribe()
-scribe.monitor_mentions()  # Runs 24/7 monitoring
+# Single run: checks mentions, processes them, saves state
+main()
 ```
 
 ### Response Format
